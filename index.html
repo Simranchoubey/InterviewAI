@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InterviewMate AI – Voice Interview Coach</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    /* ───── CSS Variables & Base ───── */
+    :root {
+      --bg:        #040d1a;
+      --surface:   #071428;
+      --card:      #0b1d35;
+      --border:    rgba(0,200,130,0.15);
+      --green:     #00c882;
+      --green-dim: #00c88230;
+      --blue:      #00aaff;
+      --text:      #e8f0fe;
+      --muted:     #7a90a8;
+      --danger:    #ff4d6d;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4,h5 { font-family: 'Syne', sans-serif; }
+
+    /* ───── Noise overlay ───── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+
+    /* ───── Glowing grid backdrop ───── */
+    .grid-bg {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,200,130,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,130,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 100%);
+    }
+
+    /* ───── Navbar ───── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(4,13,26,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 64px;
+    }
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px;
+      display: flex; align-items: center; gap: 8px; color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--green); }
+    .nav-links { display: flex; gap: 2rem; align-items: center; }
+    .nav-links a {
+      color: var(--muted); font-size: 0.9rem; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--green); }
+    .nav-cta {
+      background: var(--green); color: #040d1a;
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 0.85rem; padding: 8px 18px; border-radius: 6px;
+      border: none; cursor: pointer; text-decoration: none;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* ───── Section wrapper ───── */
+    section { position: relative; z-index: 1; }
+
+    /* ───── Hero ───── */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; text-align: center;
+      padding: 120px 1.5rem 80px;
+      background: radial-gradient(ellipse 60% 50% at 50% -10%, rgba(0,200,130,0.18) 0%, transparent 70%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--border); border-radius: 100px;
+      padding: 5px 14px; font-size: 0.78rem; color: var(--green);
+      margin-bottom: 1.5rem; letter-spacing: 0.5px;
+      background: rgba(0,200,130,0.07);
+    }
+    .hero-badge::before {
+      content: ''; width: 6px; height: 6px;
+      background: var(--green); border-radius: 50%;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100%{opacity:1} 50%{opacity:0.2}
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 5rem);
+      font-weight: 800; line-height: 1.08;
+      letter-spacing: -2px; margin-bottom: 1.25rem;
+    }
+    .hero h1 .accent { color: var(--green); }
+    .hero p {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--muted); max-width: 520px;
+      margin: 0 auto 2.5rem; line-height: 1.7;
+    }
+    /* Glowing CTA */
+    .glow-btn {
+      position: relative; display: inline-flex; align-items: center; gap: 10px;
+      background: var(--green); color: #040d1a;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1rem; padding: 14px 32px; border-radius: 50px;
+      border: none; cursor: pointer; text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.3s;
+      box-shadow: 0 0 30px rgba(0,200,130,0.4), 0 0 60px rgba(0,200,130,0.15);
+    }
+    .glow-btn:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 0 50px rgba(0,200,130,0.55), 0 0 90px rgba(0,200,130,0.2);
+    }
+    .glow-btn::after {
+      content: '';
+      position: absolute; inset: -4px; border-radius: 50px;
+      background: transparent;
+      border: 1px solid rgba(0,200,130,0.35);
+      animation: pulseRing 2s ease-out infinite;
+    }
+    @keyframes pulseRing {
+      0%  { transform: scale(1); opacity: 0.8; }
+      100%{ transform: scale(1.2); opacity: 0; }
+    }
+    .hero-sub {
+      margin-top: 1.5rem; font-size: 0.82rem; color: var(--muted);
+      display: flex; align-items: center; justify-content: center; gap: 1.5rem;
+    }
+    .hero-sub span { display: flex; align-items: center; gap: 5px; }
+
+    /* ───── Features ───── */
+    .features { padding: 100px 1.5rem; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; max-width: 1000px; margin: 0 auto;
+    }
+    .feat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem;
+      transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+      position: relative; overflow: hidden;
+    }
+    .feat-card::before {
+      content: '';
+      position: absolute; top: -60px; right: -60px;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: radial-gradient(circle, var(--green-dim), transparent 70%);
+      transition: opacity 0.3s; opacity: 0;
+    }
+    .feat-card:hover { transform: translateY(-5px); border-color: var(--green); box-shadow: 0 0 30px rgba(0,200,130,0.12); }
+    .feat-card:hover::before { opacity: 1; }
+    .feat-icon {
+      font-size: 2rem; margin-bottom: 1rem;
+      width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+      background: var(--green-dim); border-radius: 12px;
+    }
+    .feat-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feat-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.65; }
+
+    /* ───── Section headings ───── */
+    .section-label {
+      font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--green); margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800;
+      letter-spacing: -1px; margin-bottom: 1rem;
+    }
+    .section-sub { color: var(--muted); font-size: 1rem; line-height: 1.7; }
+
+    /* ───── Demo Preview ───── */
+    .demo { padding: 80px 1.5rem; }
+    .demo-inner {
+      max-width: 900px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;
+      align-items: center;
+    }
+    @media(max-width:680px){.demo-inner{grid-template-columns:1fr;}}
+    .demo-window {
+      background: var(--surface);
+      border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .demo-topbar {
+      background: var(--card); padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r{background:#ff5f57;} .dot-y{background:#ffc22d;} .dot-g{background:#28c840;}
+    .demo-chat { padding: 1rem; display: flex; flex-direction: column; gap: 10px; }
+    .chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 0.82rem; line-height: 1.55; }
+    .chat-ai  { background: rgba(0,200,130,0.1); border: 1px solid rgba(0,200,130,0.2); align-self: flex-start; }
+    .chat-user{ background: var(--card); border: 1px solid var(--border); align-self: flex-end; }
+    .demo-input {
+      display: flex; gap: 8px; align-items: center;
+      padding: 10px; border-top: 1px solid var(--border);
+      background: var(--card);
+    }
+    .demo-input-box {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); border-radius: 8px; padding: 7px 12px;
+      font-size: 0.8rem; outline: none;
+    }
+    .demo-send {
+      background: var(--green); color: #040d1a;
+      border: none; border-radius: 8px;
+      width: 32px; height: 32px; cursor: pointer;
+      display:flex; align-items:center; justify-content:center;
+      font-size: 0.9rem;
+    }
+
+    /* ───── Interview App ───── */
+    #app { padding: 100px 1.5rem 60px; }
+    .app-wrapper {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 300px 1fr;
+      gap: 1.5rem; align-items: start;
+    }
+    @media(max-width:860px){ .app-wrapper { grid-template-columns: 1fr; } }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;
+    }
+    .sidebar-label { font-size: 0.72rem; letter-spacing: 2px; text-transform: uppercase; color: var(--green); }
+    .role-select {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 10px; padding: 10px 14px;
+      font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none;
+      cursor: pointer; transition: border-color 0.2s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300c882' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+      padding-right: 36px;
+    }
+    .role-select:focus { border-color: var(--green); }
+    .role-badge {
+      font-size: 0.78rem; color: var(--green); background: var(--green-dim);
+      border-radius: 6px; padding: 4px 10px; display: inline-block; font-weight: 600;
+    }
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted); transition: background 0.3s;
+    }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 1.2s infinite; }
+
+    /* Feedback */
+    .feedback-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem;
+    }
+    .feedback-card h4 { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text); }
+    .score-row { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+    .prog-bar {
+      background: rgba(255,255,255,0.07); border-radius: 100px;
+      height: 6px; overflow: hidden; margin-bottom: 12px;
+    }
+    .prog-fill {
+      height: 100%; border-radius: 100px;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      transition: width 1s cubic-bezier(0.4,0,0.2,1);
+    }
+    .suggestion-item {
+      font-size: 0.78rem; color: var(--muted); display: flex; gap: 6px;
+      align-items: flex-start; margin-bottom: 5px; line-height: 1.5;
+    }
+    .suggestion-item::before { content: '→'; color: var(--green); flex-shrink: 0; }
+    #feedback-panel { display: none; }
+    #feedback-panel.visible { display: block; }
+
+    /* Main chat area */
+    .chat-area {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .chat-topbar {
+      background: var(--surface); padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-topbar-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; }
+    .messages-wrap {
+      flex: 1; overflow-y: auto; padding: 1.25rem;
+      display: flex; flex-direction: column; gap: 12px;
+      min-height: 340px; max-height: 420px;
+    }
+    .messages-wrap::-webkit-scrollbar { width: 4px; }
+    .messages-wrap::-webkit-scrollbar-track { background: transparent; }
+    .messages-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .msg { max-width: 80%; display: flex; flex-direction: column; gap: 3px; }
+    .msg.ai  { align-self: flex-start; }
+    .msg.user{ align-self: flex-end; }
+    .msg-sender { font-size: 0.68rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 0 4px; }
+    .msg.user .msg-sender { text-align: right; }
+    .msg-bubble {
+      padding: 11px 15px; border-radius: 14px;
+      font-size: 0.88rem; line-height: 1.6;
+    }
+    .msg.ai  .msg-bubble { background: rgba(0,200,130,0.08); border: 1px solid rgba(0,200,130,0.2); border-radius: 2px 14px 14px 14px; }
+    .msg.user .msg-bubble { background: rgba(0,170,255,0.12); border: 1px solid rgba(0,170,255,0.22); border-radius: 14px 2px 14px 14px; }
+    .typing { display: flex; gap: 5px; padding: 12px 16px; }
+    .typing span {
+      width: 7px; height: 7px; background: var(--green); border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2){animation-delay:0.2s;}
+    .typing span:nth-child(3){animation-delay:0.4s;}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+    /* Mic area */
+    .mic-area {
+      padding: 1.5rem; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    }
+    .mic-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+    .mic-ring {
+      position: absolute; width: 88px; height: 88px; border-radius: 50%;
+      border: 2px solid var(--green); opacity: 0;
+      animation: none;
+    }
+    .mic-ring.animate { animation: micPulse 1.5s ease-out infinite; }
+    .mic-ring:nth-child(2){ animation-delay: 0.5s; }
+    @keyframes micPulse {
+      0%  { transform: scale(1); opacity: 0.6; }
+      100%{ transform: scale(2.2); opacity: 0; }
+    }
+    .mic-btn {
+      position: relative; z-index: 1;
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--green-dim); border: 2px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; cursor: pointer;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.3s;
+      color: var(--green);
+    }
+    .mic-btn:hover { transform: scale(1.07); background: rgba(0,200,130,0.25); }
+    .mic-btn.active {
+      background: var(--green); color: #040d1a;
+      box-shadow: 0 0 30px rgba(0,200,130,0.5);
+    }
+    .mic-label { font-size: 0.78rem; color: var(--muted); text-align: center; }
+
+    /* Text fallback */
+    .text-input-row {
+      display: flex; gap: 8px; padding: 0 1.5rem 1.5rem;
+    }
+    .text-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 10px; padding: 10px 14px;
+      font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    .text-input:focus { border-color: var(--green); }
+    .text-input::placeholder { color: var(--muted); }
+    .send-btn {
+      background: var(--green); color: #040d1a;
+      border: none; border-radius: 10px; padding: 10px 18px;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.85rem;
+      cursor: pointer; transition: opacity 0.2s, transform 0.15s;
+    }
+    .send-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* Voice agent placeholder */
+    #voice-agent {
+      display: none;
+      margin: 0 1.5rem 1.5rem;
+      background: var(--green-dim); border: 1px solid var(--green);
+      border-radius: 10px; padding: 10px 14px;
+      font-size: 0.82rem; color: var(--green); text-align: center;
+    }
+
+    /* ───── Footer ───── */
+    footer {
+      text-align: center; padding: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 0.8rem;
+    }
+    footer span { color: var(--green); }
+
+    /* ───── Utility ───── */
+    .text-center { text-align: center; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<nav>
+  <a class="nav-logo" href="#"><span>⬡</span> InterviewMate<span>AI</span></a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#demo">Preview</a>
+    <a href="#app">Practice</a>
+  </div>
+  <a href="#app" class="nav-cta">Start Practice 🎤</a>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero">
+  <div class="grid-bg"></div>
+  <div style="position:relative;z-index:1;">
+    <div class="hero-badge">AI-POWERED VOICE COACH • LIVE</div>
+    <h1>
+      Crack Your Interviews<br/>
+      with <span class="accent">AI Voice</span> Coach
+    </h1>
+    <p>Practice real interview scenarios with an AI-powered voice mentor. Get instant feedback, improve your confidence, and land your dream job.</p>
+    <a href="#app" class="glow-btn" onclick="loadVoiceAgent()">
+      Start Practice 🎤
+    </a>
+    <div class="hero-sub">
+      <span>✓ No signup required</span>
+      <span>✓ Voice & text modes</span>
+      <span>✓ Real-time feedback</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section class="features" id="features">
+  <div style="max-width:1000px;margin:0 auto;">
+    <div class="text-center mb-6">
+      <p class="section-label">Why InterviewMate</p>
+      <h2 class="section-title">Everything you need to prepare</h2>
+      <p class="section-sub">Three core pillars that make your interview practice actually work.</p>
+    </div>
+    <div class="features-grid">
+      <!-- Card 1 -->
+      <div class="feat-card">
+        <div class="feat-icon">🎙️</div>
+        <h3>Voice Interaction</h3>
+        <p>Speak naturally as you would in a real interview. Our AI listens, understands, and responds — creating an authentic interview atmosphere from day one.</p>
+      </div>
+      <!-- Card 2 -->
+      <div class="feat-card">
+        <div class="feat-icon">⚡</div>
+        <h3>Real-time Feedback</h3>
+        <p>Receive instant analysis on your answers — clarity, confidence, pacing, and relevance. Know exactly where you stand after every response.</p>
+      </div>
+      <!-- Card 3 -->
+      <div class="feat-card">
+        <div class="feat-icon">🎯</div>
+        <h3>Role-based Interviews</h3>
+        <p>Tailor your practice to your exact target role — Software Engineer, Data Analyst, HR, or any custom profile you define.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ DEMO PREVIEW ══════════ -->
+<section class="demo" id="demo">
+  <div class="demo-inner">
+    <!-- Text side -->
+    <div>
+      <p class="section-label">Live Preview</p>
+      <h2 class="section-title">See what an AI interview feels like</h2>
+      <p class="section-sub" style="margin-bottom:1.75rem;">
+        The interview panel adapts to your role, tracks your conversation, and surfaces scores + suggestions to accelerate your growth.
+      </p>
+      <a href="#app" class="glow-btn" style="font-size:0.9rem;padding:12px 24px;">
+        Try it Now →
+      </a>
+    </div>
+    <!-- Mock chat window -->
+    <div class="demo-window">
+      <div class="demo-topbar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span style="margin-left:8px;font-size:0.75rem;color:var(--muted);">Software Engineer · Interview</span>
+      </div>
+      <div class="demo-chat">
+        <div class="chat-msg chat-ai">
+          👋 Hi! I'm your AI interview coach. Let's start with a classic — <strong>tell me about yourself.</strong>
+        </div>
+        <div class="chat-msg chat-user">
+          I'm a full-stack developer with 3 years of experience building scalable web apps using React and Node.js…
+        </div>
+        <div class="chat-msg chat-ai">
+          Great start! Good structure and confidence. Next — <strong>how do you handle tight deadlines?</strong>
+        </div>
+        <div class="chat-msg chat-user">
+          I prioritize tasks using a mix of urgency vs. impact matrix and communicate blockers early…
+        </div>
+        <div class="chat-msg chat-ai" style="font-size:0.75rem;padding:8px 12px;">
+          💡 <em>Score: 82/100 · Confidence: High · Suggestion: Add a specific example next time.</em>
+        </div>
+      </div>
+      <div class="demo-input">
+        <input class="demo-input-box" placeholder="Type your answer…" readonly/>
+        <button class="demo-send">➤</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ INTERVIEW APP ══════════ -->
+<section id="app" style="padding:80px 1.5rem 60px;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div class="text-center mb-6">
+      <p class="section-label">Interview Studio</p>
+      <h2 class="section-title">Your Practice Session</h2>
+      <p class="section-sub">Select your role, then use voice or text to answer questions. Feedback appears after a few exchanges.</p>
+    </div>
+
+    <div class="app-wrapper">
+      <!-- ── Sidebar ── -->
+      <div class="sidebar">
+        <div>
+          <p class="sidebar-label" style="margin-bottom:8px;">Interview Role</p>
+          <select class="role-select" id="role-select" onchange="updateRole()">
+            <option value="Software Engineer">💻 Software Engineer</option>
+            <option value="Data Analyst">📊 Data Analyst</option>
+            <option value="HR Specialist">🤝 HR Specialist</option>
+            <option value="Product Manager">🚀 Product Manager</option>
+            <option value="Custom">✏️ Custom</option>
+          </select>
+          <div style="margin-top:10px;">
+            <span class="sidebar-label">Active Role: </span>
+            <span class="role-badge" id="role-badge">Software Engineer</span>
+          </div>
+        </div>
+
+        <div>
+          <p class="sidebar-label" style="margin-bottom:8px;">Session Status</p>
+          <div class="status-pill">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-label">Ready to start</span>
+          </div>
+        </div>
+
+        <!-- Feedback panel (hidden initially) -->
+        <div id="feedback-panel">
+          <p class="sidebar-label" style="margin-bottom:10px;">Performance Score</p>
+          <div class="feedback-card">
+            <h4>📊 Communication</h4>
+            <div class="score-row"><span>Score</span><span id="comm-score">78%</span></div>
+            <div class="prog-bar"><div class="prog-fill" id="comm-bar" style="width:0%"></div></div>
+
+            <h4>💪 Confidence</h4>
+            <div class="score-row"><span>Level</span><span id="conf-score">85%</span></div>
+            <div class="prog-bar"><div class="prog-fill" id="conf-bar" style="width:0%"></div></div>
+
+            <h4>🎯 Relevance</h4>
+            <div class="score-row"><span>Score</span><span id="rel-score">72%</span></div>
+            <div class="prog-bar"><div class="prog-fill" id="rel-bar" style="width:0%"></div></div>
+          </div>
+
+          <div class="feedback-card" style="margin-top:10px;">
+            <h4>💡 Suggestions</h4>
+            <div id="suggestions"></div>
+          </div>
+        </div>
+
+        <div style="font-size:0.75rem;color:var(--muted);line-height:1.6;">
+          💬 Messages sent: <strong id="msg-count" style="color:var(--green);">0</strong><br/>
+          🔓 Feedback unlocks at <strong style="color:var(--green);">3 messages</strong>
+        </div>
+      </div>
+
+      <!-- ── Main chat ── -->
+      <div class="chat-area">
+        <div class="chat-topbar">
+          <span class="chat-topbar-title">🎙️ Interview Session — <span id="topbar-role">Software Engineer</span></span>
+          <button onclick="resetChat()" style="background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.3);color:#ff4d6d;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;">
+            Reset
+          </button>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages-wrap" id="messages">
+          <!-- seeded by JS -->
+        </div>
+
+        <!-- Mic area -->
+        <div class="mic-area">
+          <div class="mic-wrap">
+            <div class="mic-ring" id="ring1"></div>
+            <div class="mic-ring" id="ring2"></div>
+            <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎤</button>
+          </div>
+          <p class="mic-label" id="mic-label">Tap to start speaking</p>
+        </div>
+
+        <!-- Text input fallback -->
+        <div class="text-input-row">
+          <input class="text-input" id="text-input" placeholder="Or type your answer here…" onkeydown="if(event.key==='Enter') sendText()"/>
+          <button class="send-btn" onclick="sendText()">Send ➤</button>
+        </div>
+
+        <!-- Voice agent placeholder -->
+        <div id="voice-agent"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  Built with ❤️ for job-seekers · <span>InterviewMate AI</span> · Powered by OmniDimension Voice Agent
+</footer>
+
+<!-- ══════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+<script>
+  /* ── Data ────────────────────────────────── */
+  const ROLE_QUESTIONS = {
+    "Software Engineer": [
+      "Tell me about yourself and your engineering background.",
+      "Describe a complex technical challenge you solved recently.",
+      "How do you approach code reviews in your team?",
+      "What's your experience with system design and scalability?",
+      "Walk me through a time you had to learn a new technology quickly.",
+    ],
+    "Data Analyst": [
+      "Tell me about your experience working with data.",
+      "How do you clean and validate large datasets?",
+      "Describe a project where data insights drove a key business decision.",
+      "What tools and languages do you use for analysis?",
+      "How do you communicate complex findings to non-technical stakeholders?",
+    ],
+    "HR Specialist": [
+      "Tell me about your background in HR.",
+      "How do you handle conflict resolution between team members?",
+      "Describe your experience with talent acquisition.",
+      "How do you ensure company culture is maintained during rapid growth?",
+      "Walk me through an onboarding process you've designed.",
+    ],
+    "Product Manager": [
+      "Tell me about yourself and your PM experience.",
+      "How do you prioritize features in a crowded backlog?",
+      "Describe a product launch you led from zero to one.",
+      "How do you balance user needs vs. business goals?",
+      "Tell me about a time a product decision didn't go as planned.",
+    ],
+    "Custom": [
+      "Welcome to your custom interview session! Tell me about yourself.",
+      "What unique skills do you bring to this role?",
+      "Describe your biggest professional achievement.",
+      "Where do you see yourself in five years?",
+      "Do you have any questions for us?",
+    ],
+  };
+
+  const AI_FEEDBACK = [
+    "Good answer — clear and structured. Try adding a specific metric or outcome to strengthen it.",
+    "Nice use of examples! Your pacing is good. Consider using the STAR method (Situation, Task, Action, Result) for behavioural questions.",
+    "Strong confidence in your delivery. Make sure to tie your answer back to the role requirements.",
+    "Excellent point! Keep that level of detail — specificity is what separates great candidates.",
+    "You're covering the right themes. Practice being a bit more concise — aim for 90–120 seconds per answer.",
+  ];
+
+  const SUGGESTIONS = [
+    "Use the STAR method for behavioural questions.",
+    "Quantify your impact with numbers when possible.",
+    "Slow down slightly — pacing helps clarity.",
+    "Mirror the language from the job description.",
+    "Ask clarifying questions before diving in.",
+  ];
+
+  /* ── State ───────────────────────────────── */
+  let currentRole    = "Software Engineer";
+  let questionIndex  = 0;
+  let messageCount   = 0;
+  let micActive      = false;
+  let recognizing    = false;
+  let recognition    = null;
+
+  /* ── Init ────────────────────────────────── */
+  window.addEventListener('DOMContentLoaded', () => {
+    initSpeechRecognition();
+    seedChat();
+  });
+
+  function seedChat() {
+    const container = document.getElementById('messages');
+    container.innerHTML = '';
+    questionIndex  = 0;
+    messageCount   = 0;
+    updateMsgCount();
+    hideFeedback();
+    appendAIMessage(greet());
+    setTimeout(() => appendAIMessage(nextQuestion()), 900);
+  }
+
+  function greet() {
+    return `👋 Hello! I'm your <strong>${currentRole}</strong> interview coach. Let's get started. I'll ask you a series of questions — answer as naturally as possible. Good luck! 🎯`;
+  }
+
+  /* ── Role ────────────────────────────────── */
+  function updateRole() {
+    currentRole = document.getElementById('role-select').value;
+    document.getElementById('role-badge').textContent = currentRole;
+    document.getElementById('topbar-role').textContent = currentRole;
+    resetChat();
+  }
+
+  /* ── Questions ───────────────────────────── */
+  function nextQuestion() {
+    const qs = ROLE_QUESTIONS[currentRole] || ROLE_QUESTIONS["Custom"];
+    if (questionIndex < qs.length) {
+      return qs[questionIndex++];
+    }
+    return "That wraps up our session! Great effort. Check your performance scores on the left. 🏆";
+  }
+
+  /* ── Messaging ───────────────────────────── */
+  function appendAIMessage(html) {
+    appendMessage('ai', html);
+  }
+  function appendUserMessage(text) {
+    appendMessage('user', text);
+    messageCount++;
+    updateMsgCount();
+    if (messageCount >= 3) showFeedback();
+  }
+
+  function appendMessage(type, html) {
+    const wrap  = document.getElementById('messages');
+    const div   = document.createElement('div');
+    div.className = `msg ${type}`;
+    div.innerHTML = `
+      <span class="msg-sender">${type === 'ai' ? '🤖 AI Coach' : '🧑 You'}</span>
+      <div class="msg-bubble">${html}</div>
+    `;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function showTyping(cb, delay = 1200) {
+    const wrap   = document.getElementById('messages');
+    const typing = document.createElement('div');
+    typing.className = 'msg ai';
+    typing.id        = 'typing-indicator';
+    typing.innerHTML = `<span class="msg-sender">🤖 AI Coach</span><div class="msg-bubble typing"><span></span><span></span><span></span></div>`;
+    wrap.appendChild(typing);
+    wrap.scrollTop = wrap.scrollHeight;
+    setTimeout(() => {
+      typing.remove();
+      cb();
+    }, delay);
+  }
+
+  function handleUserInput(text) {
+    if (!text.trim()) return;
+    appendUserMessage(text);
+
+    // AI response flow
+    showTyping(() => {
+      const feedbackIdx = Math.floor(Math.random() * AI_FEEDBACK.length);
+      appendAIMessage(AI_FEEDBACK[feedbackIdx]);
+      setTimeout(() => {
+        showTyping(() => {
+          appendAIMessage(nextQuestion());
+        }, 1000);
+      }, 600);
+    }, 1400);
+  }
+
+  /* ── Text send ───────────────────────────── */
+  function sendText() {
+    const input = document.getElementById('text-input');
+    const text  = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    handleUserInput(text);
+  }
+
+  /* ── Mic ─────────────────────────────────── */
+  function toggleMic() {
+    if (!micActive) {
+      startListening();
+    } else {
+      stopListening();
+    }
+  }
+
+  function startListening() {
+    micActive = true;
+    const btn   = document.getElementById('mic-btn');
+    const label = document.getElementById('mic-label');
+    const dot   = document.getElementById('status-dot');
+    const sLabel= document.getElementById('status-label');
+    const r1    = document.getElementById('ring1');
+    const r2    = document.getElementById('ring2');
+
+    btn.classList.add('active');
+    btn.textContent = '⏹';
+    label.textContent = 'Listening… speak now';
+    dot.classList.add('active');
+    sLabel.textContent = 'Listening…';
+    r1.classList.add('animate');
+    r2.classList.add('animate');
+
+    if (recognition) {
+      try { recognition.start(); recognizing = true; } catch(e) {}
+    }
+  }
+
+  function stopListening(transcript) {
+    micActive = false;
+    const btn   = document.getElementById('mic-btn');
+    const label = document.getElementById('mic-label');
+    const dot   = document.getElementById('status-dot');
+    const sLabel= document.getElementById('status-label');
+    const r1    = document.getElementById('ring1');
+    const r2    = document.getElementById('ring2');
+
+    btn.classList.remove('active');
+    btn.textContent = '🎤';
+    label.textContent = 'Tap to start speaking';
+    dot.classList.remove('active');
+    sLabel.textContent = 'Ready';
+    r1.classList.remove('animate');
+    r2.classList.remove('animate');
+
+    if (recognition && recognizing) {
+      try { recognition.stop(); } catch(e) {}
+      recognizing = false;
+    }
+
+    if (transcript && transcript.trim()) {
+      handleUserInput(transcript);
+    }
+  }
+
+  function initSpeechRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (e) => {
+      const t = e.results[0][0].transcript;
+      stopListening(t);
+    };
+    recognition.onerror = () => stopListening('');
+    recognition.onend   = () => { if (micActive) stopListening(''); };
+  }
+
+  /* ── Feedback ────────────────────────────── */
+  function showFeedback() {
+    const panel = document.getElementById('feedback-panel');
+    panel.classList.add('visible');
+
+    // Animate bars after short delay
+    setTimeout(() => {
+      const scores = [78, 85, 72];
+      const bars   = ['comm-bar','conf-bar','rel-bar'];
+      bars.forEach((id, i) => {
+        document.getElementById(id).style.width = scores[i] + '%';
+      });
+    }, 300);
+
+    // Populate suggestions
+    const sEl = document.getElementById('suggestions');
+    sEl.innerHTML = '';
+    const picks = SUGGESTIONS.sort(() => 0.5 - Math.random()).slice(0, 3);
+    picks.forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'suggestion-item';
+      d.textContent = s;
+      sEl.appendChild(d);
+    });
+  }
+
+  function hideFeedback() {
+    const panel = document.getElementById('feedback-panel');
+    panel.classList.remove('visible');
+    ['comm-bar','conf-bar','rel-bar'].forEach(id => {
+      document.getElementById(id).style.width = '0%';
+    });
+    document.getElementById('suggestions').innerHTML = '';
+  }
+
+  function updateMsgCount() {
+    document.getElementById('msg-count').textContent = messageCount;
+  }
+
+  /* ── Reset ───────────────────────────────── */
+  function resetChat() {
+    if (micActive) stopListening('');
+    document.getElementById('status-dot').classList.remove('active');
+    document.getElementById('status-label').textContent = 'Ready to start';
+    seedChat();
+  }
+
+  /* ── Voice Agent Placeholder ─────────────── */
+  function loadVoiceAgent() {
+    const el = document.getElementById('voice-agent');
+    el.style.display = 'block';
+    el.innerHTML = `
+      <span style="font-size:1rem;">🔊</span>
+      Voice Agent Connected — OmniDimension Ready
+    `;
+    // OmniDimension voice agent script will be inserted here
+    // Example: const script = document.createElement('script');
+    //          script.src = 'https://your-omnidimension-agent-url.js';
+    //          document.body.appendChild(script);
+  }
+</script>
+</body>
+</html>
